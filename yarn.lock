@@ -1842,6 +1842,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@mantine/dates@npm:9.6.3":
+  version: 9.6.3
+  resolution: "@mantine/dates@npm:9.6.3"
+  dependencies:
+    clsx: "npm:^2.1.1"
+  peerDependencies:
+    "@mantine/core": 9.6.3
+    "@mantine/hooks": 9.6.3
+    dayjs: ">=1.0.0"
+    react: ^19.2.0
+    react-dom: ^19.2.0
+  checksum: 10c0/bb3e08b9e1df4d0a62d7527a576058dd5f362fbe2140eb123ceae8b1f6e205061ca3346fd9d80af8fb5049540d71756c97b4263792b38b492a35d45e731b2036
+  languageName: node
+  linkType: hard
+
 "@mantine/hooks@npm:9.6.3":
   version: 9.6.3
   resolution: "@mantine/hooks@npm:9.6.3"
@@ -5157,6 +5172,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dayjs@npm:1.11.13":
+  version: 1.11.13
+  resolution: "dayjs@npm:1.11.13"
+  checksum: 10c0/a3caf6ac8363c7dade9d1ee797848ddcf25c1ace68d9fe8678ecf8ba0675825430de5d793672ec87b24a69bf04a1544b176547b2539982275d5542a7955f35b7
+  languageName: node
+  linkType: hard
+
 "debug@npm:4, debug@npm:^4.0.0, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.4":
   version: 4.3.4
   resolution: "debug@npm:4.3.4"
@@ -8416,6 +8438,7 @@ __metadata:
   dependencies:
     "@mantine-tests/core": "npm:^2.1.0"
     "@mantine/core": "npm:9.6.3"
+    "@mantine/dates": "npm:9.6.3"
     "@mantine/hooks": "npm:9.6.3"
     "@playwright/test": "npm:1.63.0"
     "@rollup/plugin-node-resolve": "npm:^16.0.3"
@@ -8436,6 +8459,7 @@ __metadata:
     "@types/signale": "npm:^1.4.7"
     "@types/yargs": "npm:^17.0.35"
     "@vitejs/plugin-react": "npm:^4.7.0"
+    dayjs: "npm:1.11.13"
     esbuild: "npm:^0.28.2"
     esbuild-jest: "npm:^0.5.0"
     fs-extra: "npm:^11.4.1"

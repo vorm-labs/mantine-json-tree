@@ -123,3 +123,39 @@ Your help truly matters.
 
 ---
 https://github.com/user-attachments/assets/ce2b1ba2-51f7-43d5-8477-6d8fee103fa3
+
+## Vorm fork: controlled editing demo
+
+This fork adds `JsonTreeEditor` with recoverable inline drafts and row actions.
+Import the package stylesheet and wrap your application in `MantineProvider`.
+Basic JSON values choose Mantine text, number and Boolean inputs. Applications
+can select semantic editors explicitly with `metadata` and `resolveEditor`;
+see `examples/editors/semantic-editors.tsx` for calendars, colors, choices and
+precision-preserving decimal/BigInt text. There is no inference from strings.
+
+```tsx
+<JsonTreeEditor
+  data={value}
+  editable
+  structure
+  defaultExpanded
+  onChange={(next) => setValue(next)}
+/>
+```
+
+Click a value to edit and Apply or Cancel the draft. Use the row's Actions menu
+for property changes, insertion or deliberate type replacement, including null.
+Array entries have drag grips and keyboard-accessible move buttons. Dragging
+shows an insertion line and supports same-array movement only. Escape cancels.
+Advanced structure controls retain path selection for hidden or collapsed nodes.
+The host owns accepted data and history; `onChange` notification alone is not
+acceptance until the next value is supplied through `data`.
+
+Run the independent example from this checkout:
+
+```sh
+node .yarn/releases/yarn-4.18.1.cjs install --immutable
+node .yarn/releases/yarn-4.18.1.cjs build
+cd examples/editors
+node ../../node_modules/vite/bin/vite.js . --host 127.0.0.1 --port 4174
+```

@@ -33,6 +33,7 @@
   "devDependencies": {
     "@mantine-tests/core": "^2.1.0",
     "@mantine/core": "9.6.3",
+    "@mantine/dates": "9.6.3",
     "@mantine/hooks": "9.6.3",
     "@playwright/test": "1.63.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -53,6 +54,7 @@
     "@types/signale": "^1.4.7",
     "@types/yargs": "^17.0.35",
     "@vitejs/plugin-react": "^4.7.0",
+    "dayjs": "1.11.13",
     "esbuild": "^0.28.2",
     "esbuild-jest": "^0.5.0",
     "fs-extra": "^11.4.1",

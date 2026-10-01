@@ -1,4 +1,5 @@
-import { ColorInput, TextInput } from '@mantine/core';
+import { ColorInput, MultiSelect, Select } from '@mantine/core';
+import { DateInput, DateTimePicker } from '@mantine/dates';
 import React from 'react';
 import {
   defineJsonTreeValueEditor,
@@ -18,10 +19,14 @@ export const dateStringEditor = defineJsonTreeValueEditor({
       ? { valid: true, value: draft }
       : { valid: false, error: 'Enter a calendar date (YYYY-MM-DD)' },
   Input: (p: JsonTreeEditorInputProps) => (
-    <TextInput
-      type="date"
-      value={p.draft}
-      onChange={(e) => p.onDraftChange(e.currentTarget.value)}
+    <DateInput
+      valueFormat="YYYY-MM-DD"
+      defaultValue={dateStringEditor.parse(p.draft).valid ? p.draft : null}
+      fixOnBlur={false}
+      dateParser={(text) => (dateStringEditor.parse(text).valid ? text : null)}
+      onChange={(value) => p.onDraftChange(value ?? '')}
+      onInput={(event) => p.onDraftChange(event.currentTarget.value)}
+      popoverProps={{ withinPortal: false }}
       aria-label={p.label}
       error={p.error}
       disabled={p.disabled}
@@ -95,7 +100,94 @@ export function semanticEditor(node: JsonTreeEditorNode) {
   if (node.metadata === 'date') return dateStringEditor;
   if (node.metadata === 'decimal') return decimalStringEditor;
   if (node.metadata === 'color') return colorEditor;
+  if (node.metadata === 'datetime') return utcDateTimeEditor;
+  if (node.metadata === 'choice') return statusEditor;
+  if (node.metadata === 'choices') return tagsEditor;
   if (node.value instanceof Date) return dateAtomEditor;
   if (typeof node.value === 'bigint') return bigintEditor;
   return undefined;
 }
+
+/** Calendar values are deliberately interpreted as UTC wall time in this example. */
+export const utcDateTimeEditor = defineJsonTreeValueEditor({
+  key: 'utc-datetime',
+  accepts: (value: unknown): value is string => typeof value === 'string',
+  format: (value) => value,
+  parse: (draft) =>
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(draft) &&
+    Number.isFinite(Date.parse(draft))
+      ? { valid: true, value: draft }
+      : { valid: false, error: 'Choose a UTC date and time' },
+  Input: (p) => (
+    <DateTimePicker
+      label={p.label}
+      description="UTC"
+      withSeconds
+      value={
+        utcDateTimeEditor.parse(p.draft).valid
+          ? p.draft.replace('T', ' ').replace(/(?:\.\d{3})?Z$/, '')
+          : null
+      }
+      onChange={(value) => p.onDraftChange(value ? `${value.replace(' ', 'T')}Z` : '')}
+      popoverProps={{ withinPortal: false }}
+      disabled={p.disabled}
+      error={p.error}
+      ref={p.focusRef}
+    />
+  ),
+});
+const statuses = ['Draft', 'In review', 'Published'];
+export const statusEditor = defineJsonTreeValueEditor({
+  key: 'status',
+  accepts: (value: unknown): value is string => typeof value === 'string',
+  format: String,
+  parse: (draft) =>
+    statuses.includes(draft)
+      ? { valid: true, value: draft }
+      : { valid: false, error: 'Choose a status' },
+  Input: (p) => (
+    <Select
+      data={statuses}
+      value={p.draft}
+      onChange={(value) => p.onDraftChange(value ?? '')}
+      aria-label={p.label}
+      disabled={p.disabled}
+      error={p.error}
+      ref={p.focusRef}
+      comboboxProps={{ withinPortal: false }}
+    />
+  ),
+});
+const tags = ['Design', 'Content', 'Engineering'];
+export const tagsEditor = defineJsonTreeValueEditor({
+  key: 'tags',
+  accepts: (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((item) => typeof item === 'string'),
+  format: JSON.stringify,
+  parse: (draft) => {
+    try {
+      const value: unknown = JSON.parse(draft);
+      return Array.isArray(value) &&
+        value.every((item) => tags.includes(item)) &&
+        new Set(value).size === value.length
+        ? { valid: true, value: value as string[] }
+        : { valid: false, error: 'Choose valid tags' };
+    } catch {
+      return { valid: false, error: 'Choose valid tags' };
+    }
+  },
+  Input: (p) => (
+    <MultiSelect
+      searchable
+      data={tags}
+      value={JSON.parse(p.draft)}
+      onChange={(value) => p.onDraftChange(JSON.stringify(value))}
+      aria-label={p.label}
+      disabled={p.disabled}
+      error={p.error}
+      ref={p.focusRef}
+      comboboxProps={{ withinPortal: false }}
+    />
+  ),
+  Read: ({ node }) => <span>{node.value.join(', ') || 'No tags'}</span>,
+});

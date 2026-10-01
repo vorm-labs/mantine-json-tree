@@ -1,4 +1,4 @@
-import { Button, Group, NativeSelect, Stack, Text, TextInput } from '@mantine/core';
+import { Button, Fieldset, Group, NativeSelect, Stack, Text, TextInput } from '@mantine/core';
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { checkEditableTree, editableValueAtPath, hasEditablePath } from './lib/editable-tree';
 import type { JsonTreeOperation } from './lib/operations';
@@ -11,6 +11,9 @@ export const structureLabels = {
   rename: 'Rename',
   up: 'Move up',
   down: 'Move down',
+  actions: 'Actions',
+  drag: 'Drag to reorder',
+  advanced: 'Advanced structure controls',
   replace: 'Replace value',
   apply: 'Apply structure',
   cancel: 'Cancel structure',
@@ -80,8 +83,13 @@ interface Prompt {
   text: string;
   type: string;
 }
+export interface JsonTreeStructureHandle {
+  finish: () => boolean;
+  cancel: () => void;
+  open: (kind: Prompt['kind'], path: JsonTreePathSegments, origin?: HTMLElement) => void;
+}
 export function JsonTreeStructureControls(p: {
-  controllerRef?: React.Ref<{ finish: () => boolean; cancel: () => void }>;
+  controllerRef?: React.Ref<JsonTreeStructureHandle>;
   onStatusChange?: (
     status: { draft: string; pathSegments: JsonTreePathSegments; error?: string } | undefined
   ) => void;
@@ -101,6 +109,8 @@ export function JsonTreeStructureControls(p: {
   const [error, setError] = useState<string | null>(null);
   const target = useRef<HTMLSelectElement>(null);
   const focusPending = useRef(false);
+  const origin = useRef<HTMLElement | undefined>(undefined);
+  const promptElement = useRef<HTMLFieldSetElement>(null);
   const paths = editableTreePaths(p.data);
   const valid = hasEditablePath(p.data, path);
   const value = valid ? editableValueAtPath(p.data, path) : undefined;
@@ -127,7 +137,7 @@ export function JsonTreeStructureControls(p: {
   useEffect(() => {
     if (!p.disabled && !prompt && focusPending.current) {
       focusPending.current = false;
-      target.current?.focus();
+      (origin.current?.isConnected ? origin.current : target.current)?.focus();
     }
   }, [p.disabled, prompt, p.data, p.focusPath]);
   const request = (operation: JsonTreeOperation) => {
@@ -136,14 +146,16 @@ export function JsonTreeStructureControls(p: {
     setError(result);
     if (!result) setPrompt(undefined);
   };
-  const open = (kind: Prompt['kind']) => {
-    if (p.disabled || !valid) return;
+  const open = (kind: Prompt['kind'], selected = path, trigger?: HTMLElement) => {
+    if (p.disabled || prompt || !hasEditablePath(p.data, selected)) return;
+    origin.current = trigger;
+    setPath(selected);
     setError(null);
     setPrompt({
       kind,
       root: p.data,
-      path: [...path],
-      name: kind === 'rename' ? String(part) : '',
+      path: [...selected],
+      name: kind === 'rename' ? String(selected[selected.length - 1]) : '',
       text: '',
       type: choices[0]?.key ?? 'string',
     });
@@ -189,7 +201,11 @@ export function JsonTreeStructureControls(p: {
       setError(labels.invalid);
     }
   };
+  useEffect(() => {
+    if (prompt) promptElement.current?.querySelector<HTMLInputElement>('input, select')?.focus();
+  }, [Boolean(prompt)]);
   useImperativeHandle(p.controllerRef, () => ({
+    open,
     finish: () => {
       if (!prompt) return true;
       submit();
@@ -233,88 +249,106 @@ export function JsonTreeStructureControls(p: {
   }, [statusKey]);
   return (
     <Stack gap="xs">
-      <NativeSelect
-        ref={target}
-        label={labels.target}
-        value={JSON.stringify(path)}
-        disabled={p.disabled || Boolean(prompt)}
-        onChange={(event) => {
-          setPath(JSON.parse(event.currentTarget.value));
-          setError(null);
-        }}
-        data={paths.map((path) => ({
-          value: JSON.stringify(path),
-          label: path.length ? JSON.stringify(path) : 'root',
-        }))}
-      />
-      <Group>
-        {isWritableContainer(value) && !Array.isArray(value) && (
-          <Button disabled={p.disabled || Boolean(prompt)} onClick={() => open('add')}>
-            {labels.add}
-          </Button>
-        )}
-        {Array.isArray(value) && (
-          <Button disabled={p.disabled || Boolean(prompt)} onClick={() => open('insert')}>
-            {labels.insert}
-          </Button>
-        )}
-        {path.length > 0 && isWritableContainer(parent) && (
-          <>
-            <Button
-              disabled={p.disabled || Boolean(prompt)}
-              onClick={() =>
-                request(
-                  Array.isArray(parent)
-                    ? { kind: 'array-remove', pathSegments: parentPath, index: Number(part) }
-                    : { kind: 'property-remove', pathSegments: parentPath, key: String(part) }
-                )
-              }
-            >
-              {labels.remove}
-            </Button>
-            {!Array.isArray(parent) && (
-              <Button disabled={p.disabled || Boolean(prompt)} onClick={() => open('rename')}>
-                {labels.rename}
+      <details>
+        <summary
+          style={{
+            cursor: 'pointer',
+            color: 'var(--mantine-color-text)',
+            fontSize: 'var(--mantine-font-size-sm)',
+          }}
+        >
+          {labels.advanced}
+        </summary>
+        <Stack gap="xs" mt="xs">
+          <NativeSelect
+            ref={target}
+            label={labels.target}
+            value={JSON.stringify(path)}
+            disabled={p.disabled || Boolean(prompt)}
+            onChange={(event) => {
+              setPath(JSON.parse(event.currentTarget.value));
+              setError(null);
+            }}
+            data={paths.map((path) => ({
+              value: JSON.stringify(path),
+              label: path.length ? JSON.stringify(path) : 'root',
+            }))}
+          />
+          <Group>
+            {isWritableContainer(value) && !Array.isArray(value) && (
+              <Button disabled={p.disabled || Boolean(prompt)} onClick={() => open('add')}>
+                {labels.add}
               </Button>
             )}
-            {Array.isArray(parent) && (
+            {Array.isArray(value) && (
+              <Button disabled={p.disabled || Boolean(prompt)} onClick={() => open('insert')}>
+                {labels.insert}
+              </Button>
+            )}
+            {path.length > 0 && isWritableContainer(parent) && (
               <>
                 <Button
-                  disabled={p.disabled || Boolean(prompt) || Number(part) === 0}
+                  disabled={p.disabled || Boolean(prompt)}
                   onClick={() =>
-                    request({
-                      kind: 'array-move',
-                      pathSegments: parentPath,
-                      from: Number(part),
-                      to: Number(part) - 1,
-                    })
+                    request(
+                      Array.isArray(parent)
+                        ? { kind: 'array-remove', pathSegments: parentPath, index: Number(part) }
+                        : { kind: 'property-remove', pathSegments: parentPath, key: String(part) }
+                    )
                   }
                 >
-                  {labels.up}
+                  {labels.remove}
                 </Button>
-                <Button
-                  disabled={p.disabled || Boolean(prompt) || Number(part) >= parent.length - 1}
-                  onClick={() =>
-                    request({
-                      kind: 'array-move',
-                      pathSegments: parentPath,
-                      from: Number(part),
-                      to: Number(part) + 1,
-                    })
-                  }
-                >
-                  {labels.down}
-                </Button>
+                {!Array.isArray(parent) && (
+                  <Button disabled={p.disabled || Boolean(prompt)} onClick={() => open('rename')}>
+                    {labels.rename}
+                  </Button>
+                )}
+                {Array.isArray(parent) && (
+                  <>
+                    <Button
+                      disabled={p.disabled || Boolean(prompt) || Number(part) === 0}
+                      onClick={() =>
+                        request({
+                          kind: 'array-move',
+                          pathSegments: parentPath,
+                          from: Number(part),
+                          to: Number(part) - 1,
+                        })
+                      }
+                    >
+                      {labels.up}
+                    </Button>
+                    <Button
+                      disabled={p.disabled || Boolean(prompt) || Number(part) >= parent.length - 1}
+                      onClick={() =>
+                        request({
+                          kind: 'array-move',
+                          pathSegments: parentPath,
+                          from: Number(part),
+                          to: Number(part) + 1,
+                        })
+                      }
+                    >
+                      {labels.down}
+                    </Button>
+                  </>
+                )}
               </>
             )}
-          </>
-        )}
-        <Button disabled={p.disabled || Boolean(prompt) || !valid} onClick={() => open('replace')}>
-          {labels.replace}
-        </Button>
-      </Group>
+            <Button
+              disabled={p.disabled || Boolean(prompt) || !valid}
+              onClick={() => open('replace')}
+            >
+              {labels.replace}
+            </Button>
+          </Group>
+        </Stack>
+      </details>
       {prompt && (
-        <fieldset
+        <Fieldset
+          ref={promptElement}
+          legend={labels.apply}
           disabled={p.disabled}
           onKeyDown={(event) => {
             event.stopPropagation();
@@ -331,7 +365,6 @@ export function JsonTreeStructureControls(p: {
             }
           }}
         >
-          <legend>{labels.apply}</legend>
           {['add', 'rename'].includes(prompt.kind) && (
             <TextInput
               label={labels.name}
@@ -368,7 +401,7 @@ export function JsonTreeStructureControls(p: {
               {labels.cancel}
             </Button>
           </Group>
-        </fieldset>
+        </Fieldset>
       )}
       {error && <Text role="alert">{error}</Text>}
     </Stack>

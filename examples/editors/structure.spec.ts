@@ -3,6 +3,7 @@ test('object creation, rename and removal have host undo and deterministic targe
   page,
 }) => {
   await page.goto('/');
+  await page.getByText('Advanced structure controls', { exact: true }).click();
   const target = page.getByLabel('Structure target', { exact: true });
   await page.getByRole('button', { name: 'Add property', exact: true }).click();
   await page.getByLabel('Property name').fill('a.b');
@@ -27,6 +28,7 @@ test('array insertion, move and removal are keyboard accessible and reject inval
   page,
 }) => {
   await page.goto('/');
+  await page.getByText('Advanced structure controls', { exact: true }).click();
   const target = page.getByLabel('Structure target', { exact: true });
   await target.selectOption('["flags"]');
   await page.getByRole('button', { name: 'Insert entry', exact: true }).click();
@@ -52,6 +54,7 @@ test('duplicate keys, required fields, pending leaf edits, search and stale crea
   page,
 }) => {
   await page.goto('/');
+  await page.getByText('Advanced structure controls', { exact: true }).click();
   const target = page.getByLabel('Structure target', { exact: true });
   await target.selectOption('["date"]');
   await page.getByRole('button', { name: 'Remove', exact: true }).click();
@@ -84,6 +87,7 @@ test('renames preserve expansion and filtering while localized prompts support k
   page,
 }) => {
   await page.goto('/');
+  await page.getByText('Advanced structure controls', { exact: true }).click();
   const target = page.getByLabel('Structure target', { exact: true });
   await page.getByRole('button', { name: 'Add property', exact: true }).click();
   await page.getByLabel('Property name').fill('nested');

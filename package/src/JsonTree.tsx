@@ -313,6 +313,8 @@ export interface JsonTreeBaseProps {
 
   /** Optional leaf presentation; segmented paths are the authoritative address. */
   renderValue?: (node: JsonTreeNodePayload) => React.ReactNode | undefined;
+  /** Optional row composition for editor actions and inline drafts; receives an immutable node address. */
+  renderNodeWrapper?: (node: JsonTreeNodePayload, content: React.ReactNode) => React.ReactNode;
   /** Use encoded segmented addresses for unique expansion identity. */
   segmentedKeys?: boolean;
   /** Accessible toolbar labels; hosts may translate them. */
@@ -944,6 +946,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     validate,
     editorProps,
     renderValue,
+    renderNodeWrapper,
     segmentedKeys,
     actionLabels,
 
@@ -1338,7 +1341,13 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
       data={filteredTreeData}
       tree={tree}
       levelOffset={32}
-      renderNode={(payload) => renderJSONNode(payload, props, renderCtx, onNodeClick)}
+      renderNode={(payload) => {
+        const content = renderJSONNode(payload, props, renderCtx, onNodeClick);
+        const node = (payload.node as JSONTreeNodeData).nodeData;
+        return renderNodeWrapper && node?.pathSegments
+          ? renderNodeWrapper({ ...node, pathSegments: node.pathSegments }, content)
+          : content;
+      }}
     />
   );
 

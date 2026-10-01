@@ -1,4 +1,4 @@
-import { Button, Group, Stack, Text, TextInput } from '@mantine/core';
+import { Box, Button, Group, Paper, Stack, Text, UnstyledButton } from '@mantine/core';
 import React, {
   Component,
   forwardRef,
@@ -14,11 +14,14 @@ import {
   type JsonTreeNodePayload,
   type JsonTreeProps,
 } from './JsonTree';
+import { JsonTreeTextInput, JsonTreeNumberInput, JsonTreeBooleanInput } from './JsonTreeInputs';
+import { JsonTreeRowActions } from './JsonTreeRowActions';
 import {
   JsonTreeStructureControls,
   editableTreePaths,
   structureLabels,
   type JsonTreeCreationChoice,
+  type JsonTreeStructureHandle,
 } from './JsonTreeStructureControls';
 import { checkEditableTree, editableValueAtPath, hasEditablePath } from './lib/editable-tree';
 import {
@@ -27,8 +30,10 @@ import {
   type JsonTreeOperation,
   type JsonTreeOperationResult,
 } from './lib/operations';
-import { setValueAtPath } from './lib/path';
+import { setValueAtPath, isWritableContainer } from './lib/path';
 import { getValueType } from './lib/utils';
+import { useJsonTreeDrag } from './use-json-tree-drag';
+import classes from './JsonTreeEditor.module.css';
 
 /** Metadata belongs to the host; strings are never classified by their spelling. */
 export interface JsonTreeEditorNode extends JsonTreeNodePayload {
@@ -37,6 +42,8 @@ export interface JsonTreeEditorNode extends JsonTreeNodePayload {
 export type JsonTreeParseResult<T> = { valid: true; value: T } | { valid: false; error: string };
 export interface JsonTreeEditorInputProps {
   draft: string;
+  /** Preserve multiline editing for the lifetime of this draft. */
+  multiline?: boolean;
   onDraftChange: (draft: string) => void;
   commit: () => boolean;
   cancel: () => void;
@@ -85,7 +92,7 @@ export interface JsonTreeEditorHandle {
 }
 export interface JsonTreeEditorProps extends Omit<
   JsonTreeProps,
-  'onChange' | 'editable' | 'isEditable' | 'validate' | 'renderValue'
+  'onChange' | 'editable' | 'isEditable' | 'validate' | 'renderValue' | 'renderNodeWrapper'
 > {
   editable?: boolean;
   structure?: boolean;
@@ -114,14 +121,16 @@ export const editorLabels = {
   conflict: 'The data or editing access changed. Cancel this draft before continuing.',
   truncated: 'The tree exceeds the display limits or contains an ambiguous graph.',
 };
-const textEditor = defineJsonTreeValueEditor({
+const textEditor = /* @__PURE__ */ defineJsonTreeValueEditor({
   key: 'string',
+  Input: JsonTreeTextInput,
   accepts: (value: unknown): value is string => typeof value === 'string',
   format: (value) => value,
   parse: (draft) => ({ valid: true, value: draft }),
 });
-const numberEditor = defineJsonTreeValueEditor({
+const numberEditor = /* @__PURE__ */ defineJsonTreeValueEditor({
   key: 'number',
+  Input: JsonTreeNumberInput,
   accepts: (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value),
   format: (value) => (Object.is(value, -0) ? '-0' : String(value)),
   parse: (draft) =>
@@ -129,8 +138,9 @@ const numberEditor = defineJsonTreeValueEditor({
       ? { valid: true, value: Number(draft) }
       : { valid: false, error: editorLabels.invalid },
 });
-const booleanEditor = defineJsonTreeValueEditor({
+const booleanEditor = /* @__PURE__ */ defineJsonTreeValueEditor({
   key: 'boolean',
+  Input: JsonTreeBooleanInput,
   accepts: (value: unknown): value is boolean => typeof value === 'boolean',
   format: String,
   parse: (draft) =>
@@ -151,19 +161,7 @@ class RendererBoundary extends Component<
     return this.state.failed ? this.props.fallback : this.props.children;
   }
 }
-function DefaultInput(p: JsonTreeEditorInputProps) {
-  return (
-    <TextInput
-      value={p.draft}
-      onChange={(e) => p.onDraftChange(e.currentTarget.value)}
-      disabled={p.disabled}
-      aria-label={p.label}
-      error={p.error}
-      ref={p.focusRef}
-      maxLength={65536}
-    />
-  );
-}
+const DefaultInput = JsonTreeTextInput;
 interface Active {
   root: unknown;
   node: JsonTreeEditorNode;
@@ -174,7 +172,7 @@ interface Active {
   origin: HTMLElement | null;
 }
 /** Controlled tree and one recoverable leaf draft. There is no data store or undo stack here. */
-export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorProps>(
+export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, JsonTreeEditorProps>(
   function JsonTreeEditor(props, ref) {
     const {
       data,
@@ -195,8 +193,10 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
       ...treeProps
     } = props;
     const labels = { ...editorLabels, ...labelOverrides };
+    const [rowError, setRowError] = useState<string | null>(null);
+    const rowFocus = useRef(false);
     const [active, setActive] = useState<Active>();
-    const structureHandle = useRef<{ finish: () => boolean; cancel: () => void }>(null);
+    const structureHandle = useRef<JsonTreeStructureHandle>(null);
     const [structureDraft, setStructureDraft] = useState<{
       draft: string;
       pathSegments: readonly (string | number)[];
@@ -425,7 +425,9 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
       );
       if (!permitted(node)) return <span>{content}</span>;
       return (
-        <button
+        <UnstyledButton
+          className={classes.valueButton}
+          data-type={node.type}
           type="button"
           disabled={Boolean(active || structural || structureDraft)}
           aria-label={`${labels.edit} ${payload.path}`}
@@ -454,13 +456,20 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
           onKeyDown={(event) => event.stopPropagation()}
         >
           {content}
-        </button>
+        </UnstyledButton>
       );
     };
-    const Input = active?.editor.Input ?? DefaultInput;
+    const Input =
+      active?.editor.Input ??
+      (active?.node.type === 'number'
+        ? JsonTreeNumberInput
+        : active?.node.type === 'boolean'
+          ? JsonTreeBooleanInput
+          : DefaultInput);
     const inputProps: JsonTreeEditorInputProps | undefined = active
       ? {
           draft: active.draft,
+          multiline: typeof active.node.value === 'string' && active.node.value.includes('\n'),
           disabled: conflicted || Boolean(active.submitted),
           label: `${labels.edit} ${active.node.path}`,
           error: active.error,
@@ -540,17 +549,144 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
         return labels.invalid;
       }
     };
-    const rootEditor =
-      safe &&
-      data &&
-      typeof data === 'object' &&
-      Object.keys(data).length > 0 &&
-      (getValueType(data) === 'object' || getValueType(data) === 'array')
-        ? renderValue({ value: data, type: getValueType(data), path: 'root', pathSegments: [] })
-        : undefined;
+    const blocked = !editable || disabled || Boolean(active || structural || structureDraft);
+    const requestRow = (operation: JsonTreeOperation) => {
+      if (blocked) return;
+      rowFocus.current = true;
+      setRowError(requestOperation(operation));
+    };
+    const drag = useJsonTreeDrag(data, blocked, requestRow);
+    useEffect(() => {
+      if (!viewChange || !rowFocus.current || blocked) return;
+      rowFocus.current = false;
+      const row = Array.from(
+        drag.scope.current?.querySelectorAll<HTMLElement>('[data-json-row]') ?? []
+      ).find((element) => element.dataset.jsonRow === JSON.stringify(viewChange.path));
+      row?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    }, [viewChange, blocked]);
+    const renderDraft = () =>
+      active &&
+      inputProps && (
+        <Paper
+          withBorder
+          p="sm"
+          radius="sm"
+          className={classes.draft}
+          tabIndex={-1}
+          aria-label={`${labels.edit} ${active.node.path}`}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.nativeEvent.isComposing) return;
+            // Comboboxes and calendars own their selection keys while open.
+            const control = event.target as HTMLElement;
+            if (
+              control.getAttribute('aria-expanded') === 'true' ||
+              control.closest('[role="dialog"], [role="listbox"]')
+            ) {
+              return;
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              cancel();
+            }
+            if (
+              event.key === 'Enter' &&
+              event.target instanceof HTMLInputElement &&
+              !event.defaultPrevented
+            ) {
+              event.preventDefault();
+              finish();
+            }
+          }}
+        >
+          <Stack gap="xs">
+            <RendererBoundary
+              key={active.editor.key + JSON.stringify(active.node.pathSegments)}
+              fallback={<DefaultInput {...inputProps} />}
+            >
+              <Input {...inputProps} />
+            </RendererBoundary>
+            {conflicted && (
+              <Text role="alert" c="red">
+                {labels.conflict}
+              </Text>
+            )}
+            {active.submitted && <Text role="status">{labels.awaiting}</Text>}
+            <Group gap="xs">
+              <Button size="xs" disabled={inputProps.disabled} onClick={finish}>
+                {labels.apply}
+              </Button>
+              <Button size="xs" variant="default" onClick={cancel}>
+                {labels.cancel}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
+      );
+    // Keep a draft reachable if filtering/collapse hides its row.
+    const wrapRow = (node: JsonTreeNodePayload, content: React.ReactNode) => {
+      const key = JSON.stringify(node.pathSegments);
+      const editing = active && key === JSON.stringify(active.node.pathSegments);
+      const parentPath = node.pathSegments.slice(0, -1);
+      const parent =
+        node.pathSegments.length && hasEditablePath(data, parentPath)
+          ? editableValueAtPath(data, parentPath)
+          : undefined;
+      let nodePermitted = false;
+      try {
+        nodePermitted = permitted({ ...node, metadata: metadata?.(node) });
+      } catch {
+        /* Invalid host metadata leaves the row read-only. */
+      }
+      const marker = drag.preview?.target;
+      const isTarget = marker && key === JSON.stringify(marker.path);
+      return (
+        <Box
+          data-json-row={key}
+          className={classes.row}
+          data-drop-before={(isTarget && !marker.after) || undefined}
+          data-drop-after={(isTarget && marker.after) || undefined}
+        >
+          <Group gap="xs" wrap="nowrap" align="flex-start">
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              {content}
+              {isWritableContainer(node.value) &&
+                Object.keys(node.value).length > 0 &&
+                renderValue(node)}
+            </Box>
+            {structure && hasEditablePath(data, node.pathSegments) && (
+              <JsonTreeRowActions
+                node={node}
+                parent={parent}
+                disabled={blocked || !nodePermitted}
+                labels={{ ...structureLabels, ...structureCopy }}
+                request={requestRow}
+                dragProps={drag.props(node.pathSegments)}
+                open={(kind, path) => {
+                  if (blocked) return;
+                  rowFocus.current = true;
+                  const origin = Array.from(
+                    drag.scope.current?.querySelectorAll<HTMLElement>('[data-json-row]') ?? []
+                  )
+                    .find((element) => element.dataset.jsonRow === key)
+                    ?.querySelector<HTMLButtonElement>('button');
+                  structureHandle.current?.open(kind, path, origin ?? undefined);
+                }}
+              />
+            )}
+          </Group>
+          {editing && renderDraft()}
+        </Box>
+      );
+    };
     return (
-      <Stack gap="xs">
-        {rootEditor}
+      <Stack gap="xs" ref={drag.scope}>
+        {rowError && (
+          <Text role="alert" c="red">
+            {rowError}
+          </Text>
+        )}
         {structure && safe && (
           <JsonTreeStructureControls
             controllerRef={structureHandle}
@@ -598,46 +734,38 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
             withCopyToClipboard={false}
             displayFunctions="as-string"
             renderValue={renderValue}
+            renderNodeWrapper={wrapRow}
           />
         ) : (
           <Text role="status">{labels.truncated}</Text>
         )}
-        {active && inputProps && (
-          <section
-            tabIndex={-1}
-            aria-label={`${labels.edit} ${active.node.path}`}
-            onKeyDown={(event) => {
-              event.stopPropagation();
-              if (event.nativeEvent.isComposing) return;
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                cancel();
-              }
-              if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
-                event.preventDefault();
-                finish();
-              }
-            }}
-          >
-            <RendererBoundary
-              key={active.editor.key + JSON.stringify(active.node.pathSegments)}
-              fallback={<DefaultInput {...inputProps} />}
-            >
-              <Input {...inputProps} />
-            </RendererBoundary>
-            {conflicted && <Text role="alert">{labels.conflict}</Text>}
-            {active.submitted && <Text role="status">{labels.awaiting}</Text>}
-            <Group>
-              <Button disabled={inputProps.disabled} onClick={finish}>
-                {labels.apply}
-              </Button>
-              <Button variant="default" onClick={cancel}>
-                {labels.cancel}
-              </Button>
-            </Group>
-          </section>
-        )}
+        {active && <DraftFallback active={active} render={renderDraft} scope={drag.scope} />}
       </Stack>
     );
   }
 );
+
+function DraftFallback({
+  active,
+  render,
+  scope,
+}: {
+  active: Active;
+  render: () => React.ReactNode;
+  scope: React.RefObject<HTMLDivElement | null>;
+}) {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const check = () =>
+      setHidden(
+        !Array.from(scope.current?.querySelectorAll<HTMLElement>('[data-json-row]') ?? []).some(
+          (row) => row.dataset.jsonRow === JSON.stringify(active.node.pathSegments)
+        )
+      );
+    check();
+    const observer = new MutationObserver(check);
+    if (scope.current) observer.observe(scope.current, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [active, scope]);
+  return hidden ? render() : null;
+}

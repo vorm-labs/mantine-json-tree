@@ -91,3 +91,29 @@ Arbitrary external replacement resets the selection instead of following an old
 index. No IDs or wrappers are inserted into data. `change.operation` supplies
 host-owned undo/history metadata; the example demonstrates Undo/Redo outside the
 library. The upstream viewer's default path-key compatibility remains intact.
+
+## UX086 — Mantine inputs and discoverable row interactions
+
+`JsonTreeEditor` uses Mantine TextInput/Textarea, NumberInput and Switch for
+basic values. Applications retain custom codecs and can register dedicated
+DateInput, DateTimePicker, ColorInput, Select and MultiSelect widgets, as shown
+in `examples/editors/semantic-editors.tsx`. Exact decimal and BigInt editors keep
+text buffers; string contents never infer a date or color. Calendar dependencies
+belong to the example host and are not published library dependencies.
+
+Drafts appear beneath their tree row with Apply/Cancel. A collapsed or filtered
+row retains a reachable draft below the tree. Row menus reuse the existing
+structural prompt owner. The path selector remains in Advanced structure controls.
+Null is displayed explicitly and can be replaced through its row menu.
+
+Array entries expose drag grips and named Move up/Move down buttons. Pointer
+release requests a single same-array move; the insertion line indicates before
+or after the target. Escape and pointer cancellation discard the preview.
+Captured roots, current editing availability, host policy and controlled data
+acceptance guard every move. No cross-container moves, persisted identities,
+built-in history or schema inference are introduced.
+
+The viewer gains one optional `renderNodeWrapper(node, content)` composition
+slot; the default viewer keeps its rendering and editing behavior. The editor
+uses this slot for actions and inline drafts. A polished, responsive standalone
+Mantine demo demonstrates nested arrays, semantic inputs and host-owned history.

@@ -238,3 +238,19 @@ it('falls back safely when custom renderers throw and guards composing Enter', (
     logged.mockRestore();
   }
 });
+
+it('throwing host metadata cannot crash row rendering or grant row actions', () => {
+  render(
+    <JsonTreeEditor
+      data={{ value: 'safe' }}
+      editable
+      structure
+      defaultExpanded
+      metadata={() => {
+        throw Error('Host metadata failed');
+      }}
+    />
+  );
+  expect(screen.getByText('"safe"')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Actions root.value' })).toBeDisabled();
+});
