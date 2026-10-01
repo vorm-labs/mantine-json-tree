@@ -3,6 +3,7 @@ import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { checkEditableTree, editableValueAtPath, hasEditablePath } from './lib/editable-tree';
 import type { JsonTreeOperation } from './lib/operations';
 import { isWritableContainer, type JsonTreePathSegments } from './lib/path';
+import { useJsonTreeDismiss } from './use-json-tree-dismiss';
 export const structureLabels = {
   target: 'Structure target',
   add: 'Add property',
@@ -95,6 +96,7 @@ export function JsonTreeStructureControls(p: {
   ) => void;
   data: unknown;
   disabled: boolean;
+  cancelOnClickOutside?: boolean;
   request: (operation: JsonTreeOperation) => string | null;
   focusPath?: JsonTreePathSegments;
   labels?: Partial<typeof structureLabels>;
@@ -204,6 +206,12 @@ export function JsonTreeStructureControls(p: {
   useEffect(() => {
     if (prompt) promptElement.current?.querySelector<HTMLInputElement>('input, select')?.focus();
   }, [Boolean(prompt)]);
+  const cancel = (restoreFocus = true) => {
+    setPrompt(undefined);
+    setError(null);
+    focusPending.current = restoreFocus;
+  };
+  const dismiss = useJsonTreeDismiss(prompt, p.cancelOnClickOutside ?? false, cancel);
   useImperativeHandle(p.controllerRef, () => ({
     open,
     finish: () => {
@@ -211,11 +219,7 @@ export function JsonTreeStructureControls(p: {
       submit();
       return false;
     },
-    cancel: () => {
-      setPrompt(undefined);
-      setError(null);
-      focusPending.current = true;
-    },
+    cancel,
   }));
   const statusKey = JSON.stringify(
     prompt
@@ -348,17 +352,12 @@ export function JsonTreeStructureControls(p: {
       {prompt && (
         <Fieldset
           ref={promptElement}
+          {...dismiss}
           legend={labels.apply}
           disabled={p.disabled}
           onKeyDown={(event) => {
             event.stopPropagation();
             if (event.nativeEvent.isComposing) return;
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              setPrompt(undefined);
-              setError(null);
-              focusPending.current = true;
-            }
             if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
               event.preventDefault();
               submit();
@@ -391,15 +390,7 @@ export function JsonTreeStructureControls(p: {
           )}
           <Group>
             <Button onClick={submit}>{labels.apply}</Button>
-            <Button
-              onClick={() => {
-                setPrompt(undefined);
-                setError(null);
-                target.current?.focus();
-              }}
-            >
-              {labels.cancel}
-            </Button>
+            <Button onClick={() => cancel()}>{labels.cancel}</Button>
           </Group>
         </Fieldset>
       )}

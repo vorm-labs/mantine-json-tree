@@ -26,7 +26,7 @@ export const dateStringEditor = defineJsonTreeValueEditor({
       dateParser={(text) => (dateStringEditor.parse(text).valid ? text : null)}
       onChange={(value) => p.onDraftChange(value ?? '')}
       onInput={(event) => p.onDraftChange(event.currentTarget.value)}
-      popoverProps={{ withinPortal: false }}
+      popoverProps={{ withinPortal: true }}
       aria-label={p.label}
       error={p.error}
       disabled={p.disabled}
@@ -61,7 +61,7 @@ export const colorEditor = defineJsonTreeValueEditor({
       error={p.error}
       disabled={p.disabled}
       ref={p.focusRef}
-      popoverProps={{ withinPortal: false }}
+      popoverProps={{ withinPortal: true }}
     />
   ),
   Read: ({ node }) => (
@@ -142,7 +142,7 @@ function UtcDateTimeInput(p: JsonTreeEditorInputProps) {
           : null
       }
       onChange={(value) => p.onDraftChange(value ? `${value.replace(' ', 'T')}${fraction}Z` : '')}
-      popoverProps={{ withinPortal: false }}
+      popoverProps={{ withinPortal: true }}
       disabled={p.disabled}
       error={p.error}
       ref={p.focusRef}
@@ -168,7 +168,7 @@ export const statusEditor = defineJsonTreeValueEditor({
       disabled={p.disabled}
       error={p.error}
       ref={p.focusRef}
-      comboboxProps={{ withinPortal: false }}
+      comboboxProps={{ withinPortal: true }}
     />
   ),
 });
@@ -200,7 +200,7 @@ export const tagsEditor = defineJsonTreeValueEditor({
       disabled={p.disabled}
       error={p.error}
       ref={p.focusRef}
-      comboboxProps={{ withinPortal: false }}
+      comboboxProps={{ withinPortal: true }}
     />
   ),
   Read: ({ node }) => <span>{node.value.join(', ') || 'No tags'}</span>,

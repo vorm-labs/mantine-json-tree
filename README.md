@@ -172,3 +172,10 @@ switch. This controls presentation, not permission to move values.
 The demo uses the UTC date-time picker for both `instant` (a native Date) and
 `scheduled` (an explicitly registered string). Applying Instant preserves Date
 identity and milliseconds; calendar/time changes are interpreted as UTC.
+
+Set `cancelOnClickOutside` on `JsonTreeEditor` to discard an unfinished value or
+structural draft when clicking outside it (default false). Owned popup/portal
+interactions count as inside. Outside cancellation leaves focus at the clicked
+control. Escape cancels a focused draft, including open popups, and returns focus
+to its trigger; Escape during IME composition is ignored. Cancellation does not
+undo a change already accepted by the host.

@@ -73,7 +73,7 @@ test('explicit calendars and choice controls retain staged values until Apply', 
   await page.getByRole('spinbutton', { name: 'UTC hours', exact: true }).fill('10');
   await page.getByRole('spinbutton', { name: 'UTC hours', exact: true }).press('Tab');
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
-  await expect(host(page)).toContainText('\"scheduled\": \"2026-10-15T10:30:00Z\"');
+  await expect(host(page)).toContainText('"scheduled": "2026-10-15T10:30:00Z"');
   await page.getByRole('button', { name: 'Edit root.status', exact: true }).click();
   const status = page.getByRole('combobox', { name: 'Edit root.status', exact: true });
   await status.click();

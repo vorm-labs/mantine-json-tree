@@ -32,6 +32,7 @@ import {
 } from './lib/operations';
 import { setValueAtPath } from './lib/path';
 import { getValueType } from './lib/utils';
+import { useJsonTreeDismiss } from './use-json-tree-dismiss';
 import { useJsonTreeDrag } from './use-json-tree-drag';
 import classes from './JsonTreeEditor.module.css';
 
@@ -98,6 +99,8 @@ export interface JsonTreeEditorProps extends Omit<
   structure?: boolean;
   /** Show row up/down buttons alongside drag handles. Defaults to true. */
   withReorderButtons?: boolean;
+  /** Discard an active draft on outside pointer interaction. Defaults to false. */
+  cancelOnClickOutside?: boolean;
   isOperationAllowed?: (operation: JsonTreeOperation, node: JsonTreeEditorNode) => boolean | string;
   creationChoices?: readonly JsonTreeCreationChoice[];
   structureLabels?: Partial<typeof structureLabels>;
@@ -181,6 +184,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
       editable = false,
       structure = false,
       withReorderButtons = true,
+      cancelOnClickOutside = false,
       isOperationAllowed,
       creationChoices,
       structureLabels: structureCopy,
@@ -283,7 +287,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
       queueMicrotask(() => {
         if (a.origin?.isConnected) a.origin.focus();
       });
-    const cancel = () => {
+    const cancel = (restoreFocus = true) => {
       const a = activeRef.current;
       if (!live.current) return;
       if (!a) {
@@ -291,8 +295,9 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
         return;
       }
       publish(undefined);
-      restore(a);
+      if (restoreFocus) restore(a);
     };
+    const dismiss = useJsonTreeDismiss(active, cancelOnClickOutside, cancel);
     const finish = (): boolean => {
       const a = activeRef.current;
       if (!a) return !structuralRef.current && (structureHandle.current?.finish() ?? true);
@@ -575,6 +580,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
           p="sm"
           radius="sm"
           className={classes.draft}
+          {...dismiss}
           tabIndex={-1}
           aria-label={`${labels.edit} ${active.node.path}`}
           onClick={(event) => event.stopPropagation()}
@@ -588,10 +594,6 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
               control.closest('[role="dialog"], [role="listbox"]')
             ) {
               return;
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              cancel();
             }
             if (
               event.key === 'Enter' &&
@@ -620,7 +622,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
               <Button size="xs" disabled={inputProps.disabled} onClick={finish}>
                 {labels.apply}
               </Button>
-              <Button size="xs" variant="default" onClick={cancel}>
+              <Button size="xs" variant="default" onClick={() => cancel()}>
                 {labels.cancel}
               </Button>
             </Group>
@@ -689,6 +691,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
         {structure && safe && (
           <JsonTreeStructureControls
             controllerRef={structureHandle}
+            cancelOnClickOutside={cancelOnClickOutside}
             onStatusChange={setStructureDraft}
             data={data}
             disabled={!editable || disabled || Boolean(active || structural)}

@@ -49,6 +49,7 @@ function Demo() {
   const [status, setStatus] = useState<JsonTreeEditStatus>({ state: 'idle' });
   const [refuse, setRefuse] = useState(false);
   const [editable, setEditable] = useState(true);
+  const [cancelOnClickOutside, setCancelOnClickOutside] = useState(false);
   const [withReorderButtons, setWithReorderButtons] = useState(false);
   const [nl, setNl] = useState(false);
   const ref = useRef<JsonTreeEditorHandle>(null);
@@ -114,10 +115,16 @@ function Demo() {
               checked={withReorderButtons}
               onChange={(event) => setWithReorderButtons(event.currentTarget.checked)}
             />
+            <Switch
+              label="Cancel edit on outside click"
+              checked={cancelOnClickOutside}
+              onChange={(event) => setCancelOnClickOutside(event.currentTarget.checked)}
+            />
             <Divider />
             <JsonTreeEditor
               structure
               withReorderButtons={withReorderButtons}
+              cancelOnClickOutside={cancelOnClickOutside}
               title="Content"
               size="sm"
               showIndentGuides
