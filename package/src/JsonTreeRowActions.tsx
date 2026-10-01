@@ -11,6 +11,7 @@ export function JsonTreeRowActions(p: {
   node: JsonTreeNodePayload;
   parent: unknown;
   disabled: boolean;
+  withReorderButtons: boolean;
   labels: typeof structureLabels;
   open: JsonTreeStructureHandle['open'];
   request: (op: JsonTreeOperation) => void;
@@ -44,26 +45,30 @@ export function JsonTreeRowActions(p: {
           >
             <IconGripVertical size={16} />
           </ActionIcon>
-          <ActionIcon
-            variant="subtle"
-            size="sm"
-            aria-label={`${labels.up} ${node.path}`}
-            title={labels.up}
-            disabled={p.disabled || index === 0}
-            onClick={() => move(index - 1)}
-          >
-            <IconArrowUp size={15} />
-          </ActionIcon>
-          <ActionIcon
-            variant="subtle"
-            size="sm"
-            aria-label={`${labels.down} ${node.path}`}
-            title={labels.down}
-            disabled={p.disabled || index >= (p.parent as unknown[]).length - 1}
-            onClick={() => move(index + 1)}
-          >
-            <IconArrowDown size={15} />
-          </ActionIcon>
+          {p.withReorderButtons && (
+            <>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label={`${labels.up} ${node.path}`}
+                title={labels.up}
+                disabled={p.disabled || index === 0}
+                onClick={() => move(index - 1)}
+              >
+                <IconArrowUp size={15} />
+              </ActionIcon>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label={`${labels.down} ${node.path}`}
+                title={labels.down}
+                disabled={p.disabled || index >= (p.parent as unknown[]).length - 1}
+                onClick={() => move(index + 1)}
+              >
+                <IconArrowDown size={15} />
+              </ActionIcon>
+            </>
+          )}
         </>
       )}
       <Menu withinPortal={false} position="bottom-end" returnFocus>

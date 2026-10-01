@@ -111,12 +111,16 @@ test('row menus expose null replacement, rename, add and remove without selectin
 test('keyboard and pointer reordering use one accepted move and support undo', async ({ page }) => {
   await page.goto('/');
   const down = page.getByRole('button', { name: 'Move down root.sections.0', exact: true });
+  await expect(down).toHaveCount(0);
+  await page.getByRole('switch', { name: 'Show reorder buttons', exact: true }).check();
   await down.focus();
   await down.press('Enter');
   await expect(
     page.getByRole('button', { name: 'Edit root.sections.0.title', exact: true })
   ).toHaveText('Features');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show reorder buttons', exact: true }).uncheck();
+  await expect(down).toHaveCount(0);
   await drag(page, 0, 2, false);
   await expect(page.locator('[data-drop-after]')).toHaveCount(1);
   await page.mouse.up();

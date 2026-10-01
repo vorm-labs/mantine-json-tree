@@ -10,6 +10,7 @@ import {
   MantineProvider,
   Paper,
   Stack,
+  Switch,
   Text,
   Title,
   useMantineColorScheme,
@@ -48,6 +49,7 @@ function Demo() {
   const [status, setStatus] = useState<JsonTreeEditStatus>({ state: 'idle' });
   const [refuse, setRefuse] = useState(false);
   const [editable, setEditable] = useState(true);
+  const [withReorderButtons, setWithReorderButtons] = useState(false);
   const [nl, setNl] = useState(false);
   const ref = useRef<JsonTreeEditorHandle>(null);
   const past = useRef<unknown[]>([]);
@@ -68,7 +70,7 @@ function Demo() {
               Click a value to edit. Use row menus to add, rename or remove.
             </Text>
             <Text c="dimmed">
-              Drag the grip beside an array entry to reorder, or use its up and down buttons.
+              Drag an array entry to reorder. Enable reorder buttons for up and down controls.
             </Text>
           </div>
           <Button variant="default" onClick={() => toggleColorScheme()}>
@@ -107,9 +109,15 @@ function Demo() {
                 Redo
               </Button>
             </Group>
+            <Switch
+              label="Show reorder buttons"
+              checked={withReorderButtons}
+              onChange={(event) => setWithReorderButtons(event.currentTarget.checked)}
+            />
             <Divider />
             <JsonTreeEditor
               structure
+              withReorderButtons={withReorderButtons}
               title="Content"
               size="sm"
               showIndentGuides

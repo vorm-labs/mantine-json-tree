@@ -96,6 +96,8 @@ export interface JsonTreeEditorProps extends Omit<
 > {
   editable?: boolean;
   structure?: boolean;
+  /** Show row up/down buttons alongside drag handles. Defaults to true. */
+  withReorderButtons?: boolean;
   isOperationAllowed?: (operation: JsonTreeOperation, node: JsonTreeEditorNode) => boolean | string;
   creationChoices?: readonly JsonTreeCreationChoice[];
   structureLabels?: Partial<typeof structureLabels>;
@@ -178,6 +180,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
       data,
       editable = false,
       structure = false,
+      withReorderButtons = true,
       isOperationAllowed,
       creationChoices,
       structureLabels: structureCopy,
@@ -654,6 +657,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
               <JsonTreeRowActions
                 node={node}
                 parent={parent}
+                withReorderButtons={withReorderButtons}
                 disabled={blocked || !nodePermitted}
                 labels={{ ...structureLabels, ...structureCopy }}
                 request={requestRow}

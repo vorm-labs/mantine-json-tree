@@ -163,3 +163,8 @@ node ../../node_modules/vite/bin/vite.js . --host 127.0.0.1 --port 4174
 A registered whole-value array/object editor occupies a single labelled row. Its
 custom value replaces the expandable raw children; unregistered containers keep
 the normal tree presentation. Search still matches the underlying values.
+
+Set `<JsonTreeEditor structure withReorderButtons={false} />` to hide row up/down
+buttons while keeping drag handles and the advanced keyboard controls. The option
+defaults to true. The demo starts with it off and includes a Show reorder buttons
+switch. This controls presentation, not permission to move values.
