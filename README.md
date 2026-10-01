@@ -168,3 +168,7 @@ Set `<JsonTreeEditor structure withReorderButtons={false} />` to hide row up/dow
 buttons while keeping drag handles and the advanced keyboard controls. The option
 defaults to true. The demo starts with it off and includes a Show reorder buttons
 switch. This controls presentation, not permission to move values.
+
+The demo uses the UTC date-time picker for both `instant` (a native Date) and
+`scheduled` (an explicitly registered string). Applying Instant preserves Date
+identity and milliseconds; calendar/time changes are interpreted as UTC.

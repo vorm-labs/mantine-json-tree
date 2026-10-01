@@ -78,6 +78,7 @@ export const colorEditor = defineJsonTreeValueEditor({
 });
 export const dateAtomEditor = defineJsonTreeValueEditor({
   key: 'date-atom',
+  Input: UtcDateTimeInput,
   accepts: (value: unknown): value is Date =>
     value instanceof Date && Number.isFinite(value.getTime()),
   format: (value) => value.toISOString(),
@@ -118,24 +119,37 @@ export const utcDateTimeEditor = defineJsonTreeValueEditor({
     Number.isFinite(Date.parse(draft))
       ? { valid: true, value: draft }
       : { valid: false, error: 'Choose a UTC date and time' },
-  Input: (p) => (
+  Input: UtcDateTimeInput,
+});
+
+/** Mantine edits UTC wall time through seconds; retain the source's fractional seconds. */
+function UtcDateTimeInput(p: JsonTreeEditorInputProps) {
+  const fraction = p.draft.match(/\.\d{3}(?=Z$)/)?.[0] ?? '';
+  return (
     <DateTimePicker
       label={p.label}
       description="UTC"
+      valueFormat="YYYY-MM-DD HH:mm:ss"
       withSeconds
+      timePickerProps={{
+        hoursInputLabel: 'UTC hours',
+        minutesInputLabel: 'UTC minutes',
+        secondsInputLabel: 'UTC seconds',
+      }}
       value={
         utcDateTimeEditor.parse(p.draft).valid
           ? p.draft.replace('T', ' ').replace(/(?:\.\d{3})?Z$/, '')
           : null
       }
-      onChange={(value) => p.onDraftChange(value ? `${value.replace(' ', 'T')}Z` : '')}
+      onChange={(value) => p.onDraftChange(value ? `${value.replace(' ', 'T')}${fraction}Z` : '')}
       popoverProps={{ withinPortal: false }}
       disabled={p.disabled}
       error={p.error}
       ref={p.focusRef}
     />
-  ),
-});
+  );
+}
+
 const statuses = ['Draft', 'In review', 'Published'];
 export const statusEditor = defineJsonTreeValueEditor({
   key: 'status',

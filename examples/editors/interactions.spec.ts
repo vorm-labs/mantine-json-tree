@@ -69,8 +69,11 @@ test('explicit calendars and choice controls retain staged values until Apply', 
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(host(page)).toContainText('"date": "2026-10-20"');
   await page.getByRole('button', { name: 'Edit root.scheduled', exact: true }).click();
-  await expect(page.locator('.mantine-DateTimePicker-input')).toBeVisible();
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.locator('.mantine-DateTimePicker-input').click();
+  await page.getByRole('spinbutton', { name: 'UTC hours', exact: true }).fill('10');
+  await page.getByRole('spinbutton', { name: 'UTC hours', exact: true }).press('Tab');
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(host(page)).toContainText('\"scheduled\": \"2026-10-15T10:30:00Z\"');
   await page.getByRole('button', { name: 'Edit root.status', exact: true }).click();
   const status = page.getByRole('combobox', { name: 'Edit root.status', exact: true });
   await status.click();

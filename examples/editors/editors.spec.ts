@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+test.use({ timezoneId: 'America/New_York' });
 test('exact decimal, BigInt, date and text have explicit controlled commits', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Edit root.amount', exact: true }).click();
@@ -19,12 +20,25 @@ test('exact decimal, BigInt, date and text have explicit controlled commits', as
     '999999999999999999999n'
   );
   await page.getByRole('button', { name: 'Edit root.instant', exact: true }).click();
-  await page
-    .getByRole('textbox', { name: 'Edit root.instant', exact: true })
-    .fill('2027-01-01T09:00:00.000Z');
+  await page.locator('.mantine-DateTimePicker-input').click();
+  await page.getByRole('button', { name: '2 October 2026', exact: true }).click();
+  await page.getByRole('spinbutton', { name: 'UTC hours', exact: true }).fill('09');
+  await page.getByRole('spinbutton', { name: 'UTC hours', exact: true }).press('Tab');
+  await expect(page.getByRole('region', { name: 'Host value' })).toContainText(
+    '2026-10-01T12:00:00.123Z'
+  );
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Host value' })).toContainText(
-    '2027-01-01T09:00:00.000Z'
+    '2026-10-02T09:00:00.123Z'
+  );
+  await page.getByRole('button', { name: 'Edit root.instant', exact: true }).click();
+  // Re-entering the Date-only registration proves the committed value is still a Date.
+  await expect(page.locator('.mantine-DateTimePicker-input')).toBeVisible();
+  await page.locator('.mantine-DateTimePicker-input').click();
+  await page.getByRole('button', { name: '3 October 2026', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Host value' })).toContainText(
+    '2026-10-02T09:00:00.123Z'
   );
   await page.getByRole('button', { name: 'Edit root.label', exact: true }).focus();
   await page.keyboard.press('Enter');

@@ -29,7 +29,7 @@ function Demo() {
     date: '2026-10-01',
     amount: '999999999999999999.123456789',
     color: '#336699',
-    instant: new Date('2026-10-01T12:00:00Z'),
+    instant: new Date('2026-10-01T12:00:00.123Z'),
     integer: BigInt('9007199254740993'),
     label: 'Hello',
     flags: [true, false],
