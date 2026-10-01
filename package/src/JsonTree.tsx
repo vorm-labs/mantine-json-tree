@@ -311,7 +311,7 @@ export interface JsonTreeBaseProps {
   /** Props forwarded to the inline editor input */
   editorProps?: JsonTreeEditorProps;
 
-  /** Optional leaf presentation; segmented paths are the authoritative address. */
+  /** Custom value presentation replaces the whole node, including container children. */
   renderValue?: (node: JsonTreeNodePayload) => React.ReactNode | undefined;
   /** Optional row composition for editor actions and inline drafts; receives an immutable node address. */
   renderNodeWrapper?: (node: JsonTreeNodePayload, content: React.ReactNode) => React.ReactNode;
@@ -496,6 +496,8 @@ function CopyNodeButton({
   );
 }
 
+type PresentedTreeNode = JSONTreeNodeData & { customValue?: React.ReactNode };
+
 function renderJSONNode(
   { node, expanded, hasChildren, elementProps, tree }: RenderTreeNodePayload,
   props: JsonTreeProps,
@@ -641,15 +643,7 @@ function renderJSONNode(
           </>
         )}
         {(() => {
-          const custom =
-            pathSegments &&
-            props.renderValue?.({
-              value,
-              type,
-              path,
-              pathSegments,
-              ...(key === undefined ? {} : { key }),
-            });
+          const custom = (jsonNode as PresentedTreeNode).customValue;
           if (custom !== undefined) return custom;
           const formattedValue = formatValue(value, type);
           // Segments, not the display path: two different nodes can share a path
@@ -961,7 +955,6 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   } = props;
 
   void actionLabels;
-  void renderValue; // Consumed by renderJSONNode, not forwarded to the DOM.
   const getStyles = useStyles<JsonTreeFactory>({
     name: 'JsonTree',
     props,
@@ -1336,9 +1329,25 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     editorProps,
   };
 
+  // Search the original tree, then present registered compound values as one row.
+  // This retains matches inside a value without duplicating its raw children.
+  const presentedTreeData = useMemo(() => {
+    if (!renderValue) return filteredTreeData;
+    const present = (node: JSONTreeNodeData): PresentedTreeNode => {
+      const nd = node.nodeData;
+      const customValue = nd?.pathSegments
+        ? renderValue({ ...nd, pathSegments: nd.pathSegments })
+        : undefined;
+      return customValue !== undefined
+        ? { ...node, children: undefined, customValue }
+        : { ...node, children: node.children?.map((child) => present(child as JSONTreeNodeData)) };
+    };
+    return filteredTreeData.map(present);
+  }, [filteredTreeData, renderValue]);
+
   const treeComponent = (
     <Tree
-      data={filteredTreeData}
+      data={presentedTreeData}
       tree={tree}
       levelOffset={32}
       renderNode={(payload) => {

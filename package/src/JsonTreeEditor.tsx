@@ -30,7 +30,7 @@ import {
   type JsonTreeOperation,
   type JsonTreeOperationResult,
 } from './lib/operations';
-import { setValueAtPath, isWritableContainer } from './lib/path';
+import { setValueAtPath } from './lib/path';
 import { getValueType } from './lib/utils';
 import { useJsonTreeDrag } from './use-json-tree-drag';
 import classes from './JsonTreeEditor.module.css';
@@ -649,12 +649,7 @@ export const JsonTreeEditor = /* @__PURE__ */ forwardRef<JsonTreeEditorHandle, J
           data-drop-after={(isTarget && marker.after) || undefined}
         >
           <Group gap="xs" wrap="nowrap" align="flex-start">
-            <Box style={{ flex: 1, minWidth: 0 }}>
-              {content}
-              {isWritableContainer(node.value) &&
-                Object.keys(node.value).length > 0 &&
-                renderValue(node)}
-            </Box>
+            <Box style={{ flex: 1, minWidth: 0 }}>{content}</Box>
             {structure && hasEditablePath(data, node.pathSegments) && (
               <JsonTreeRowActions
                 node={node}

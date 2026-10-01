@@ -188,7 +188,7 @@ test('cross-array drops and hidden drafts preserve the current edit boundary', a
   await page.setViewportSize({ width: 1280, height: 1200 });
   await page.goto('/');
   const grip = page.getByRole('button', { name: 'Drag to reorder root.flags.0', exact: true });
-  const destination = page.getByRole('button', { name: 'Actions root.tags.0', exact: true });
+  const destination = page.getByRole('button', { name: 'Actions root.sections.0', exact: true });
   await grip.scrollIntoViewIfNeeded();
   const a = (await grip.boundingBox())!;
   const b = (await destination.boundingBox())!;
@@ -224,4 +224,32 @@ test('calendar invalid text stays recoverable and date-like strings are not infe
   await page.getByRole('button', { name: 'Apply', exact: true }).click();
   await page.getByRole('button', { name: 'Edit root.label', exact: true }).click();
   await expect(label).toHaveClass(/mantine-TextInput-input/);
+});
+
+test('whole-value tags use one aligned row and stay searchable and editable', async ({ page }) => {
+  await page.goto('/');
+  const row = page.locator(`[data-json-row='["tags"]']`);
+  const value = page.getByRole('button', { name: 'Edit root.tags', exact: true });
+  await expect(value).toHaveText('Design, Content');
+  await expect(page.locator(`[data-json-row^='["tags",']`)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Collapse root.tags', exact: true })).toHaveCount(
+    0
+  );
+  const keyBounds = (await row.locator('[data-key="tags"]').boundingBox())!;
+  const valueBounds = (await value.boundingBox())!;
+  expect(
+    Math.abs(keyBounds.y + keyBounds.height / 2 - valueBounds.y - valueBounds.height / 2)
+  ).toBeLessThan(3);
+  // Ordinary arrays still show their indexed entries.
+  await expect(page.getByRole('button', { name: 'Edit root.flags.0', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Search JSON', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search JSON', exact: true }).fill('Design');
+  await expect(page.getByRole('button', { name: 'Edit root.flags.0', exact: true })).toHaveCount(0);
+  await expect(value).toBeVisible();
+  await value.click();
+  await page.getByRole('combobox', { name: 'Edit root.tags', exact: true }).click();
+  await page.getByRole('option', { name: 'Engineering', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(value).toHaveText('Design, Content, Engineering');
+  await expect(host(page)).toContainText('Engineering');
 });

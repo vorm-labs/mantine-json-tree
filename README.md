@@ -159,3 +159,7 @@ node .yarn/releases/yarn-4.18.1.cjs build
 cd examples/editors
 node ../../node_modules/vite/bin/vite.js . --host 127.0.0.1 --port 4174
 ```
+
+A registered whole-value array/object editor occupies a single labelled row. Its
+custom value replaces the expandable raw children; unregistered containers keep
+the normal tree presentation. Search still matches the underlying values.
