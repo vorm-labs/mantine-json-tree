@@ -59,7 +59,7 @@ test('rejection and access changes retain recoverable drafts; translation and ca
   await expect(input).toBeDisabled();
   await page.getByRole('button', { name: 'Change language' }).click();
   await page.getByRole('button', { name: 'Annuleren', exact: true }).click();
-  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /^Edit / })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Host value' })).toContainText('9007199254740993n');
 });
 test('custom color popover keeps focus and does not commit on blur', async ({ page }) => {

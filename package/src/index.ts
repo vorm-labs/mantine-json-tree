@@ -27,3 +27,8 @@ export type {
   JsonTreeParseResult,
   JsonTreeEditStatus,
 } from './JsonTreeEditor';
+
+export { applyJsonTreeOperation, rebaseJsonTreePath } from './lib/operations';
+export type { JsonTreeOperation, JsonTreeOperationResult } from './lib/operations';
+export type { JsonTreeCreationChoice } from './JsonTreeStructureControls';
+export { structureLabels } from './JsonTreeStructureControls';

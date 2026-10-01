@@ -66,3 +66,28 @@ Npm publication and upstream acceptance are separate activities.
 
 Source/API changes, regression fixtures and standalone examples are intended to
 be reviewable independently of the packaging-only script and scoped manifest.
+
+## Structural editing (separate follow-up)
+
+`JsonTreeEditor structure` adds explicit property add/remove/rename and array
+insert/remove/move. The public `applyJsonTreeOperation` helper checks each
+operation and returns an immutable candidate, previous/next target value and
+focus address. Move `to` is the final index after removal, within the same array.
+Empty/dotted/numeric/prototype-looking object keys are own properties; duplicate
+names and invalid indices fail. There is no automatic parent/root creation.
+
+`isOperationAllowed(operation, node)` and `validate(next, change)` govern every
+request, including replacements. The structural target selector remains
+reachable while nodes are collapsed or filtered. Creation choices are explicit
+host factories; default choices include scalar values and empty containers.
+Cancel has no data effect. Active leaf drafts must be applied or canceled before
+structural actions; structural prompts also participate in finish/cancel and
+pending status. Replacement/access changes invalidate prompt authority.
+
+The wrapper enables unique segmented node keys and rebases expansion/focus on
+acknowledged rename/move. Search text stays under its existing owner. Focus moves
+to the selector with the new node, predictable neighbor or parent selected.
+Arbitrary external replacement resets the selection instead of following an old
+index. No IDs or wrappers are inserted into data. `change.operation` supplies
+host-owned undo/history metadata; the example demonstrates Undo/Redo outside the
+library. The upstream viewer's default path-key compatibility remains intact.

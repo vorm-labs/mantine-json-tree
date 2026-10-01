@@ -14,7 +14,19 @@ import {
   type JsonTreeNodePayload,
   type JsonTreeProps,
 } from './JsonTree';
+import {
+  JsonTreeStructureControls,
+  editableTreePaths,
+  structureLabels,
+  type JsonTreeCreationChoice,
+} from './JsonTreeStructureControls';
 import { checkEditableTree, editableValueAtPath, hasEditablePath } from './lib/editable-tree';
+import {
+  applyJsonTreeOperation,
+  rebaseJsonTreePath,
+  type JsonTreeOperation,
+  type JsonTreeOperationResult,
+} from './lib/operations';
 import { setValueAtPath } from './lib/path';
 import { getValueType } from './lib/utils';
 
@@ -62,6 +74,7 @@ export function defineJsonTreeValueEditor<T>(definition: {
 }
 export interface JsonTreeEditStatus {
   state: 'idle' | 'editing' | 'invalid' | 'awaiting' | 'conflict';
+  source?: 'value' | 'structure';
   pathSegments?: readonly (string | number)[];
   draft?: string;
   error?: string;
@@ -75,6 +88,10 @@ export interface JsonTreeEditorProps extends Omit<
   'onChange' | 'editable' | 'isEditable' | 'validate' | 'renderValue'
 > {
   editable?: boolean;
+  structure?: boolean;
+  isOperationAllowed?: (operation: JsonTreeOperation, node: JsonTreeEditorNode) => boolean | string;
+  creationChoices?: readonly JsonTreeCreationChoice[];
+  structureLabels?: Partial<typeof structureLabels>;
   disabled?: boolean;
   resolveEditor?: (node: JsonTreeEditorNode) => JsonTreeValueEditorDefinition | undefined;
   metadata?: (node: JsonTreeNodePayload) => unknown;
@@ -162,6 +179,10 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
     const {
       data,
       editable = false,
+      structure = false,
+      isOperationAllowed,
+      creationChoices,
+      structureLabels: structureCopy,
       disabled = false,
       resolveEditor,
       metadata,
@@ -175,13 +196,55 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
     } = props;
     const labels = { ...editorLabels, ...labelOverrides };
     const [active, setActive] = useState<Active>();
+    const structureHandle = useRef<{ finish: () => boolean; cancel: () => void }>(null);
+    const [structureDraft, setStructureDraft] = useState<{
+      draft: string;
+      pathSegments: readonly (string | number)[];
+      error?: string;
+    }>();
+    const [structural, setStructural] = useState<{
+      root: unknown;
+      result: JsonTreeOperationResult;
+    }>();
+    const structuralRef = useRef(structural);
+    structuralRef.current = structural;
+    const [expanded, setExpanded] = useState<string[]>(() =>
+      treeProps.defaultExpanded
+        ? editableTreePaths(data)
+            .filter((path) => path.length < (treeProps.maxDepth ?? 64))
+            .map((path) => JSON.stringify(path))
+        : []
+    );
+    const [viewChange, setViewChange] = useState<{
+      data: unknown;
+      path: readonly (string | number)[];
+    }>();
+    const rebase = (operation: JsonTreeOperation) => {
+      const next = (treeProps.expanded ?? expanded).flatMap((key) => {
+        try {
+          const path = rebaseJsonTreePath(JSON.parse(key), operation);
+          return path ? [JSON.stringify(path)] : [];
+        } catch {
+          return [];
+        }
+      });
+      setExpanded(next);
+      treeProps.onExpandedChange?.(next);
+    };
     const live = useRef(true);
     const activeRef = useRef(active);
     activeRef.current = active;
     const rootRef = useRef(data);
     rootRef.current = data;
-    const authority = useRef({ editable, disabled, isEditable, validate, onChange });
-    authority.current = { editable, disabled, isEditable, validate, onChange };
+    const authority = useRef({
+      editable,
+      disabled,
+      isEditable,
+      validate,
+      onChange,
+      isOperationAllowed,
+    });
+    authority.current = { editable, disabled, isEditable, validate, onChange, isOperationAllowed };
     useEffect(() => {
       live.current = true;
       return () => {
@@ -219,13 +282,17 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
       });
     const cancel = () => {
       const a = activeRef.current;
-      if (!live.current || !a) return;
+      if (!live.current) return;
+      if (!a) {
+        structureHandle.current?.cancel();
+        return;
+      }
       publish(undefined);
       restore(a);
     };
     const finish = (): boolean => {
       const a = activeRef.current;
-      if (!a) return true;
+      if (!a) return !structuralRef.current && (structureHandle.current?.finish() ?? true);
       const current = authority.current;
       if (
         !live.current ||
@@ -254,7 +321,17 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
           return true;
         }
         const next = setValueAtPath(rootRef.current, a.node.pathSegments, parsed.value);
-        const change = { ...a.node, value: parsed.value, previousValue: a.node.value };
+        const operation: JsonTreeOperation = {
+          kind: 'replace',
+          pathSegments: a.node.pathSegments,
+          value: parsed.value,
+        };
+        const allowed = current.isOperationAllowed?.(operation, a.node) ?? true;
+        if (allowed !== true) {
+          publish({ ...a, error: typeof allowed === 'string' ? allowed : labels.refused });
+          return false;
+        }
+        const change = { ...a.node, value: parsed.value, previousValue: a.node.value, operation };
         const error = current.validate?.(next, change);
         if (error || !checkEditableTree(next)) {
           publish({ ...a, error: error || labels.invalid });
@@ -280,6 +357,11 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
     useImperativeHandle(ref, () => ({ finish, cancel }));
     useEffect(() => {
       if (active?.submitted && isEqual(active.submitted.next, data)) {
+        rebase({
+          kind: 'replace',
+          pathSegments: active.node.pathSegments,
+          value: active.submitted.next,
+        });
         publish(undefined);
         restore(active);
       }
@@ -293,11 +375,23 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
               : active.error
                 ? 'invalid'
                 : 'editing',
+          source: 'value',
           pathSegments: active.node.pathSegments,
           draft: active.draft,
           ...(active.error ? { error: active.error } : {}),
         }
-      : { state: 'idle' };
+      : structural
+        ? {
+            state: Object.is(structural.root, data) ? 'awaiting' : 'conflict',
+            pathSegments: structural.result.operation.pathSegments,
+          }
+        : structureDraft
+          ? {
+              ...structureDraft,
+              source: 'structure',
+              state: structureDraft.error ? 'invalid' : 'editing',
+            }
+          : { state: 'idle' };
     const statusKey = JSON.stringify(status);
     useEffect(() => {
       onEditStatusChange?.(status);
@@ -333,7 +427,7 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
       return (
         <button
           type="button"
-          disabled={Boolean(active)}
+          disabled={Boolean(active || structural || structureDraft)}
           aria-label={`${labels.edit} ${payload.path}`}
           onClick={(event) => {
             event.stopPropagation();
@@ -341,6 +435,8 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
               !live.current ||
               !Object.is(data, rootRef.current) ||
               activeRef.current ||
+              structuralRef.current ||
+              structureDraft ||
               !permitted(node) ||
               display.length > 65536
             ) {
@@ -388,6 +484,62 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
           },
         }
       : undefined;
+    useEffect(() => {
+      if (structural && isEqual(structural.result.data, data)) {
+        rebase(structural.result.operation);
+        setViewChange({ data, path: structural.result.focusPath });
+        structuralRef.current = undefined;
+        setStructural(undefined);
+      }
+    }, [data, structural]);
+    const requestOperation = (operation: JsonTreeOperation): string | null => {
+      const current = authority.current;
+      if (
+        !live.current ||
+        !Object.is(rootRef.current, data) ||
+        !current.editable ||
+        current.disabled ||
+        activeRef.current ||
+        structuralRef.current
+      ) {
+        return labels.refused;
+      }
+      try {
+        const result = applyJsonTreeOperation(data, operation);
+        const payload: JsonTreeEditorNode = {
+          path: `root.${operation.pathSegments.join('.')}`,
+          pathSegments: operation.pathSegments,
+          type: getValueType(result.previousValue),
+          value: result.previousValue,
+        };
+        payload.metadata = metadata?.(payload);
+        if (!(current.isEditable?.(payload) ?? true)) return labels.refused;
+        const allowed = current.isOperationAllowed?.(operation, payload) ?? true;
+        if (allowed !== true) return typeof allowed === 'string' ? allowed : labels.refused;
+        const change = {
+          ...payload,
+          value: result.value,
+          previousValue: result.previousValue,
+          operation,
+        };
+        const error = current.validate?.(result.data, change);
+        if (error) return error;
+        if (!current.onChange) return labels.refused;
+        const next = { root: data, result };
+        structuralRef.current = next;
+        setStructural(next);
+        if (current.onChange(result.data, change) === false) {
+          structuralRef.current = undefined;
+          setStructural(undefined);
+          return labels.refused;
+        }
+        return null;
+      } catch {
+        structuralRef.current = undefined;
+        setStructural(undefined);
+        return labels.invalid;
+      }
+    };
     const rootEditor =
       safe &&
       data &&
@@ -399,10 +551,49 @@ export const JsonTreeEditor = forwardRef<JsonTreeEditorHandle, JsonTreeEditorPro
     return (
       <Stack gap="xs">
         {rootEditor}
+        {structure && safe && (
+          <JsonTreeStructureControls
+            controllerRef={structureHandle}
+            onStatusChange={setStructureDraft}
+            data={data}
+            disabled={!editable || disabled || Boolean(active || structural)}
+            request={requestOperation}
+            focusPath={
+              structural && isEqual(structural.result.data, data)
+                ? structural.result.focusPath
+                : viewChange && Object.is(viewChange.data, data)
+                  ? viewChange.path
+                  : undefined
+            }
+            labels={structureCopy}
+            choices={creationChoices}
+          />
+        )}
+        {structural && (
+          <Group>
+            <Text role="status">
+              {Object.is(structural.root, data) ? labels.awaiting : labels.conflict}
+            </Text>
+            <Button
+              onClick={() => {
+                structuralRef.current = undefined;
+                setStructural(undefined);
+              }}
+            >
+              {labels.cancel}
+            </Button>
+          </Group>
+        )}
         {safe ? (
           <JsonTree
             {...treeProps}
             data={data}
+            segmentedKeys
+            expanded={treeProps.expanded ?? expanded}
+            onExpandedChange={(next) => {
+              setExpanded(next);
+              treeProps.onExpandedChange?.(next);
+            }}
             editable={false}
             withCopyToClipboard={false}
             displayFunctions="as-string"

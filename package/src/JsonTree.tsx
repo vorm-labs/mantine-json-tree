@@ -313,6 +313,18 @@ export interface JsonTreeBaseProps {
 
   /** Optional leaf presentation; segmented paths are the authoritative address. */
   renderValue?: (node: JsonTreeNodePayload) => React.ReactNode | undefined;
+  /** Use encoded segmented addresses for unique expansion identity. */
+  segmentedKeys?: boolean;
+  /** Accessible toolbar labels; hosts may translate them. */
+  actionLabels?: {
+    search?: string;
+    expand?: string;
+    collapse?: string;
+    expandAll?: string;
+    collapseAll?: string;
+    copy?: string;
+    copyAll?: string;
+  };
 }
 
 /** Display mode for functions in JSON data */
@@ -339,6 +351,8 @@ export interface JsonTreeNodePayload {
 export interface JsonTreeChange extends JsonTreeNodePayload {
   /** The value the node held before the edit */
   previousValue: unknown;
+  /** Generic editor intent; not a persistence command. */
+  operation?: import('./lib/operations').JsonTreeOperation;
 }
 
 export interface JsonTreeProps
@@ -758,6 +772,8 @@ function renderJSONNode(
       <ActionIcon
         size="xs"
         variant="subtle"
+        aria-label={`${expanded ? (props.actionLabels?.collapse ?? 'Collapse') : (props.actionLabels?.expand ?? 'Expand')} ${path}`}
+        aria-expanded={expanded}
         onClick={handleToggleExpanded}
         {...getStyles('expandCollapse')}
       >
@@ -800,6 +816,7 @@ function renderJSONNode(
           size="xs"
           variant="subtle"
           color="gray"
+          aria-label={`${props.actionLabels?.copy ?? 'Copy'} ${path}`}
           onClick={handleCopy}
           {...getStyles('copyButton')}
         >
@@ -927,6 +944,8 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     validate,
     editorProps,
     renderValue,
+    segmentedKeys,
+    actionLabels,
 
     classNames,
     style,
@@ -938,6 +957,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     ...others
   } = props;
 
+  void actionLabels;
   void renderValue; // Consumed by renderJSONNode, not forwarded to the DOM.
   const getStyles = useStyles<JsonTreeFactory>({
     name: 'JsonTree',
@@ -955,10 +975,27 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
   const responsiveClassName = useRandomClassName();
 
   // Convert JSON data to Mantine Tree format
-  const treeData = useMemo(
-    () => [convertToTreeData(data, rootName ?? 'root', rootName ?? 'root', 0, displayFunctions)],
-    [data, rootName, displayFunctions]
-  );
+  const treeData = useMemo(() => {
+    const root = convertToTreeData(
+      data,
+      rootName ?? 'root',
+      rootName ?? 'root',
+      0,
+      displayFunctions
+    );
+    if (segmentedKeys) {
+      const walk = (node: JSONTreeNodeData, position: number[]) => {
+        node.value = node.nodeData?.pathSegments
+          ? JSON.stringify(node.nodeData.pathSegments)
+          : `synthetic:${JSON.stringify(position)}`;
+        node.children?.forEach((child, index) =>
+          walk(child as JSONTreeNodeData, [...position, index])
+        );
+      };
+      walk(root, []);
+    }
+    return [root];
+  }, [data, rootName, displayFunctions, segmentedKeys]);
 
   // Calculate initial expanded state — use controlled prop if provided
   const initialExpandedState = useMemo(() => {
@@ -1334,6 +1371,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
               {withSearch && (
                 <ActionIcon
                   size="sm"
+                  aria-label={actionLabels?.search ?? 'Search JSON'}
                   variant={searchOpen ? 'light' : 'subtle'}
                   color="gray"
                   onClick={() => {
@@ -1355,6 +1393,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                     size="sm"
                     variant="subtle"
                     color="gray"
+                    aria-label={actionLabels?.expandAll ?? 'Expand all'}
                     onClick={handleExpandAll}
                     {...getStyles('controls')}
                   >
@@ -1364,6 +1403,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                     size="sm"
                     variant="subtle"
                     color="gray"
+                    aria-label={actionLabels?.collapseAll ?? 'Collapse all'}
                     onClick={handleCollapseAll}
                     {...getStyles('controls')}
                   >
@@ -1377,6 +1417,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
                   size="sm"
                   variant="subtle"
                   color={copiedAll ? 'green' : 'gray'}
+                  aria-label={actionLabels?.copyAll ?? 'Copy all'}
                   onClick={handleCopyAll}
                   {...getStyles('copyAllButton')}
                 >
