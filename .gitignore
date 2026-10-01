@@ -156,3 +156,7 @@ POST.md
 .claude/memory/
 
 docs/public/social.jpeg
+
+# Standalone editor verification output
+test-results/
+playwright-report/

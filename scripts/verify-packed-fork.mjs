@@ -1,0 +1,18 @@
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+const archive=resolve(process.argv[2]);
+const consumer=mkdtempSync(join(tmpdir(),'json-tree-consumer-'));
+const root=process.cwd();
+const run=(cmd,args)=>execFileSync(cmd,args,{cwd:consumer,stdio:'inherit',env:{...process.env,npm_config_cache:join(tmpdir(),'json-tree-npm-cache')}});
+writeFileSync(join(consumer,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{'@vorm-labs/mantine-json-tree':`file:${archive}`,'@mantine/core':'9.6.3','@mantine/hooks':'9.6.3','@tabler/icons-react':'3.36.0',react:'19.3.0','react-dom':'19.3.0','@types/react':'19.3.0','@types/react-dom':'19.3.0',typescript:'6.0.3',esbuild:'0.28.2'}},null,2));
+writeFileSync(join(consumer,'tsconfig.json'),JSON.stringify({compilerOptions:{strict:true,noEmit:true,jsx:'react-jsx',target:'ES2020',module:'ESNext',moduleResolution:'bundler',skipLibCheck:true},include:['*.tsx']}));
+writeFileSync(join(consumer,'custom.tsx'),readFileSync('examples/editors/semantic-editors.tsx','utf8').replaceAll('../../package/src','@vorm-labs/mantine-json-tree'));
+writeFileSync(join(consumer,'consumer.tsx'),`import {JsonTreeEditor} from '@vorm-labs/mantine-json-tree';import{semanticEditor}from'./custom';export const Example=()=> <JsonTreeEditor data={{date:'2026-10-01',atom:new Date(),integer:BigInt('1')}} editable resolveEditor={semanticEditor} onChange={()=>false}/>;`);
+run('npm',['install','--ignore-scripts','--no-audit','--no-fund']);
+run(process.execPath,[join(consumer,'node_modules/typescript/bin/tsc'),'--noEmit']);
+run(process.execPath,[join(consumer,'node_modules/esbuild/bin/esbuild'),'consumer.tsx','--bundle','--minify','--format=esm','--outfile=consumer.js']);
+const source=readFileSync(join(consumer,'consumer.js'),'utf8');
+if(/@vorm-labs\/(?:forms|schemas|contracts|services)/.test(source))throw Error('Unexpected Vorm dependency');
+console.log(`Isolated packed consumer passed: ${consumer}; source checkout ${root}`);

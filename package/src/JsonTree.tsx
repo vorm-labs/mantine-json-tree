@@ -310,6 +310,9 @@ export interface JsonTreeBaseProps {
 
   /** Props forwarded to the inline editor input */
   editorProps?: JsonTreeEditorProps;
+
+  /** Optional leaf presentation; segmented paths are the authoritative address. */
+  renderValue?: (node: JsonTreeNodePayload) => React.ReactNode | undefined;
 }
 
 /** Display mode for functions in JSON data */
@@ -622,6 +625,16 @@ function renderJSONNode(
           </>
         )}
         {(() => {
+          const custom =
+            pathSegments &&
+            props.renderValue?.({
+              value,
+              type,
+              path,
+              pathSegments,
+              ...(key === undefined ? {} : { key }),
+            });
+          if (custom !== undefined) return custom;
           const formattedValue = formatValue(value, type);
           // Segments, not the display path: two different nodes can share a path
           // string, and editing must never be ambiguous about which one it means.
@@ -913,6 +926,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     isEditable,
     validate,
     editorProps,
+    renderValue,
 
     classNames,
     style,
@@ -924,6 +938,7 @@ export const JsonTree = factory<JsonTreeFactory>((_props) => {
     ...others
   } = props;
 
+  void renderValue; // Consumed by renderJSONNode, not forwarded to the DOM.
   const getStyles = useStyles<JsonTreeFactory>({
     name: 'JsonTree',
     props,

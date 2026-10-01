@@ -1,4 +1,5 @@
 module.exports = {
+  testPathIgnorePatterns: ['/node_modules/', '/examples/'],
   testEnvironment: 'jest-environment-jsdom',
   transform: {
     '^.+\\.tsx?$': 'esbuild-jest',
